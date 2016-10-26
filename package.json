@@ -35,6 +35,6 @@
   "scripts": {
     "serve": "php bin/console server:run",
     "watch": "php bin/console maba:webpack:dev-server",
-    "start": "./bin/concurrently --kill-others \"npm run serve\" \"npm run watch\""
+    "start": "./node_modules/.bin/concurrently --kill-others \"npm run serve\" \"npm run watch\""
   }
 }
