@@ -26,8 +26,10 @@ module.exports = function makeWebpackConfig(options) {
 
     config.resolve = {
         alias: options.alias,
-        extensions: ['', '.js', '.jsx'],
-        modulesDirectories: ['node_modules', '']
+        extensions: ['.js', '.jsx'],
+        modules: [
+            'node_modules'
+        ]
     };
 
     config.output = {
@@ -69,18 +71,22 @@ module.exports = function makeWebpackConfig(options) {
 
     // Initialize module
     config.module = {
-        preLoaders: [{
+        rules: [{
             // query string is needed for URLs inside css files, like bootstrap
+            enforce: "pre",
             test: /\.(gif|png|jpe?g|svg)(\?.*)?$/i,
-            loader: 'image-webpack'
-        }],
-        loaders: [{
+            loader: 'image-webpack-loader',
+            options: options.parameters.image_loader_options || {
+                progressive: true,
+                optimizationLevel: 7
+            }
+        }, {
             // JS LOADER
             // Reference: https://github.com/babel/babel-loader
             // Transpile .js files using babel-loader
             // Compiles ES6 and ES7 into ES5 code
             test: /\.jsx?$/i,
-            loaders: ['babel'],
+            use: 'babel-loader',
             exclude: /node_modules/
         }, {
             // ASSET LOADER
@@ -94,13 +100,16 @@ module.exports = function makeWebpackConfig(options) {
             test: /\.(png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot)(\?.*)?$/i,
 
             // put original name in the destination filename, too
-            loader: 'file?name=[name].[hash].[ext]'
+            loader: 'file-loader',
+            options: {
+                name: '[name].[hash].[ext]'
+            }
         }, {
             // HTML LOADER
             // Reference: https://github.com/webpack/raw-loader
             // Allow loading html through js
             test: /\.html$/i,
-            loader: 'raw'
+            use: 'raw'
         }]
     };
 
@@ -117,35 +126,77 @@ module.exports = function makeWebpackConfig(options) {
         //
         // Reference: https://github.com/webpack/style-loader
         // Use style-loader in development for hot-loading
-        loader: ExtractTextPlugin.extract('style', 'css?sourceMap!postcss')
+        use: ExtractTextPlugin.extract({
+            fallback: 'style-loader',
+            use: [
+                {
+                    // translates CSS into CommonJS
+                    loader: 'css-loader',
+                    options: {
+                        sourceMap: !BUILD
+                    }
+                }, {
+                    // translates CSS into CommonJS
+                    loader: 'postcss-loader'
+                }
+            ]
+        })
     };
 
     // Add cssLoader to the loader list
-    config.module.loaders.push(cssLoader);
+    config.module.rules.push(cssLoader);
 
     // add less support
-    config.module.loaders.push({
+    config.module.rules.push({
         test: /\.less$/i,
-        loader: ExtractTextPlugin.extract('style', 'css?sourceMap!postcss!less?sourceMap')
+        use: ExtractTextPlugin.extract({
+            fallback: 'style-loader',
+            use: [
+                {
+                    // translates CSS into CommonJS
+                    loader: 'css-loader',
+                    options: {
+                        sourceMap: !BUILD
+                    }
+                }, {
+                    // translates CSS into CommonJS
+                    loader: 'postcss-loader'
+                }, {
+                    // compiles Less to CSS
+                    loader: 'less-loader',
+                    options: {
+                        sourceMap: !BUILD
+                    }
+                }
+            ]
+        })
     });
 
     // add sass support
-    config.module.loaders.push({
+    config.module.rules.push({
         test: /\.scss$/i,
-        loader: ExtractTextPlugin.extract('style', 'css?sourceMap!postcss!sass?sourceMap')
-    });
-
-
-    /**
-     * PostCSS
-     * Reference: https://github.com/postcss/autoprefixer-core
-     * Add vendor prefixes to your css
-     */
-    config.postcss = [
-        autoprefixer({
-            browsers: ['last 2 version']
+        use: ExtractTextPlugin.extract({
+            fallback: 'style-loader',
+            use: [
+                {
+                    // translates CSS into CommonJS
+                    loader: 'css-loader',
+                    options: {
+                        sourceMap: !BUILD
+                    }
+                }, {
+                    // translates CSS into CommonJS
+                    loader: 'postcss-loader'
+                }, {
+                    // compiles Sass to CSS
+                    loader: 'sass-loader',
+                    options: {
+                        sourceMap: !BUILD
+                    }
+                }
+            ]
         })
-    ];
+    });
 
     /**
      * Plugins
@@ -153,12 +204,10 @@ module.exports = function makeWebpackConfig(options) {
      * List: http://webpack.github.io/docs/list-of-plugins.html
      */
     config.plugins = [
-        new ExtractTextPlugin(
-            BUILD ? '[name].[hash].css' : '[name].bundle.css',
-            {
-                disable: !options.parameters.extract_css
-            }
-        )
+        new ExtractTextPlugin({
+            filename: BUILD ? '[name].[hash].css' : '[name].bundle.css',
+            disable: !options.parameters.extract_css
+        })
     ];
 
     var manifestPathParts = options.manifest_path.split('/');
@@ -167,11 +216,6 @@ module.exports = function makeWebpackConfig(options) {
     // needed to use binary files (like images) as entry-points
     // puts file-loader emitted files into manifest
     config.plugins.push(new ExtractFilePlugin());
-
-    config.imageWebpackLoader = options.parameters.image_loader_options || {
-            progressive: true,
-            optimizationLevel: 7
-        };
 
     if (process.env.WEBPACK_MODE === 'watch' && process.env.TTY_MODE === 'on') {
         config.plugins.push(new DashboardPlugin());
@@ -182,7 +226,7 @@ module.exports = function makeWebpackConfig(options) {
         config.plugins.push(
             // Reference: http://webpack.github.io/docs/list-of-plugins.html#noerrorsplugin
             // Only emit files when there are no errors
-            new webpack.NoErrorsPlugin(),
+            new webpack.NoEmitOnErrorsPlugin(),
 
             // Reference: http://webpack.github.io/docs/list-of-plugins.html#dedupeplugin
             // Dedupe modules in the output
